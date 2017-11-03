@@ -1,2 +1,1 @@
-# SmartThingsPersonal
-This repository is for the devices that I have.  
+# Fork of johndoyle popp strike lock device handler, with lock icons and events
