@@ -8,10 +8,11 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
- *
+ * 
+ * Modified with lock icons and event log
  */
 metadata {
-	definition (name: "Z-Wave Popp Electronic Door Opener Control Module", namespace: "johndoyle", author: "John Doyle") {
+	definition (name: "Z-Wave Popp Electronic Door Lock Control Module", namespace: "johndoyle", author: "John Doyle") {
 		capability "Actuator"
 		capability "Lock"
 		capability "Refresh"
@@ -48,19 +49,19 @@ metadata {
 	tiles(scale: 2) {
 		multiAttributeTile(name:"toggle", type: "generic", width: 6, height: 4){
 			tileAttribute ("device.lock", key: "PRIMARY_CONTROL") {
-				attributeState "locked", label:'Push', action:"lock.unlock", icon:"st.security.alarm.clear", backgroundColor:"#00A0DC", nextState:"unlocking"
+				attributeState "locked", label:'Locked', action:"lock.unlock", icon:"st.locks.lock.locked", backgroundColor:"#00A0DC", nextState:"unlocking"
 				attributeState "unlocked", label:'unlocked', action:"lock.lock", icon:"st.locks.lock.unlocked", backgroundColor:"#ffffff", nextState:"locking"
 				attributeState "unknown", label:"unknown", action:"lock.lock", icon:"st.locks.lock.unknown", backgroundColor:"#ffffff", nextState:"locking"
 				attributeState "locking", label:'locking', icon:"st.locks.lock.locked", backgroundColor:"#00A0DC"
-				attributeState "unlocking", label:'Ding Dong', icon:"st.security.alarm.alarm", backgroundColor:"#e86d13"
+				attributeState "unlocking", label:'Unlocked', icon:"st.locks.lock.unlocked", backgroundColor:"#e86d13"
 			}
             tileAttribute ("device.battery", key: "SECONDARY_CONTROL") {
                 attributeState "battery", label:'Battery: ${currentValue}%', unit:""
             }
 		}
     	valueTile("status", "device.lock", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
-			state "locked", label:'Ready', icon:"st.security.alarm.clear"
-            state "unlocking", label:'Ding Dong', icon:"st.security.alarm.alarm"
+			state "locked", label:'Locked', icon:"st.locks.lock.locked"
+            state "unlocking", label:'Unlocked', icon:"st.locks.lock.unlocked"
 		}
 		standardTile("refresh", "device.lock", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
 			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
@@ -71,7 +72,7 @@ metadata {
 	}
     preferences {
         input "lockTimeoutSeconds", "number", title: "Timeout", description: "Lock Timeout in Seconds",
-              range: "1..59", displayDuringSetup: false, defaultValue: 1, required: true
+              range: "1..59", displayDuringSetup: false, defaultValue: 1, required: false
     }
 }
 
@@ -137,7 +138,7 @@ def zwaveEvent(DoorLockOperationReport cmd) {
 		map.value = "locked"
     	map.isStateChange = true
     	map.displayed = true
-		map.descriptionText = "was Rung"
+		map.descriptionText = "Unlocked"
 	} else if (cmd.doorLockMode >= 0x40) {
 		map.value = "unknown"
 	} else if (cmd.doorLockMode & 1) {
@@ -255,7 +256,7 @@ def lockAndCheck(doorLockMode) {
 
 def lock() {
 	unlockwtimeout()
-//    sendEvent(name: "lock", value: "locked", isStateChange: "true", descriptionText: "The Bell was Rung (lock)" )
+   
 //	lockAndCheck(DoorLockOperationSet.DOOR_LOCK_MODE_DOOR_SECURED)
 }
 
@@ -265,6 +266,7 @@ def unlock() {
 }
 
 def unlockwtimeout() {
+ //	sendEvent(name: "lock", value: "locked", isStateChange: "true", descriptionText: "Unlocked" )
 	lockAndCheck(DoorLockOperationSet.DOOR_LOCK_MODE_DOOR_UNSECURED_WITH_TIMEOUT)
 }
 
