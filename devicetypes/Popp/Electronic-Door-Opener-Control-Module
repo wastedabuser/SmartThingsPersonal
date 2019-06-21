@@ -71,8 +71,10 @@ metadata {
 		details(["toggle", "battery", "refresh"])
 	}
     preferences {
-        input "lockTimeoutSeconds", "number", title: "Timeout", description: "Lock Timeout in Seconds",
-              range: "1..59", displayDuringSetup: false, defaultValue: 1, required: false
+        input "lockTimeoutSeconds", "number", title: "Timeout (sec)", description: "Lock Timeout in Seconds",
+              range: "0..59", displayDuringSetup: false, defaultValue: 1, required: false
+        input "lockTimeoutMinutes", "number", title: "Timeout (min)", description: "Lock Timeout in Minutes",
+              range: "0..255", displayDuringSetup: false, defaultValue: 0, required: false
     }
 }
 
@@ -89,7 +91,7 @@ def updated() {
 
 def configure() {
     def cmds = []
-        cmds << zwave.doorLockV1.doorLockConfigurationSet(insideDoorHandlesState: 0, lockTimeoutMinutes: 0, lockTimeoutSeconds: lockTimeoutSeconds.toInteger(), operationType: 2, outsideDoorHandlesState: 0).format()
+        cmds << zwave.doorLockV1.doorLockConfigurationSet(insideDoorHandlesState: 0, lockTimeoutMinutes: lockTimeoutMinutes.toInteger(), lockTimeoutSeconds: lockTimeoutSeconds.toInteger(), operationType: 2, outsideDoorHandlesState: 0).format()
 	delayBetween(cmds, 4200)
 }
 
@@ -112,6 +114,7 @@ def parse(String description) {
 		return null
 	} else {
 		def cmd = zwave.parse(description, [ 0x98: 1, 0x72: 2, 0x85: 2, 0x86: 1 ])
+        log.debug "cmd parsed to $cmd"
 		if (cmd) {
 			result = zwaveEvent(cmd)
 		}
@@ -138,7 +141,7 @@ def zwaveEvent(DoorLockOperationReport cmd) {
 		map.value = "locked"
     	map.isStateChange = true
     	map.displayed = true
-		map.descriptionText = "Unlocked"
+		map.descriptionText = "Locked"
 	} else if (cmd.doorLockMode >= 0x40) {
 		map.value = "unknown"
 	} else if (cmd.doorLockMode & 1) {
@@ -208,13 +211,14 @@ def zwaveEvent(physicalgraph.zwave.commands.wakeupv2.WakeUpNotification cmd) {
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
-//	log.debug "BatteryReport"
-	def map = [ name: "battery", unit: "%" ]
+	log.debug "BatteryReport"
+	def map = [ name: "battery", unit: "%", displayed: true ]
 	if (cmd.batteryLevel == 0xFF) {
 		map.value = 1
 		map.descriptionText = "$device.displayName has a low battery"
 	} else {
 		map.value = cmd.batteryLevel
+        map.descriptionText = "$device.displayName battery is ${cmd.batteryLevel}%"
 	}
 	state.lastbatt = now()
 	createEvent(map)
@@ -276,9 +280,11 @@ def stateCheck() {
 }
 
 def refresh() {
-	def cmds = [secure(zwave.doorLockV1.doorLockOperationGet())]
+	def cmds = []
 	if (state.assoc == zwaveHubNodeId) {
 		log.debug "$device.displayName is associated to ${state.assoc}"
+    	cmds << secure(zwave.doorLockV1.doorLockOperationGet())
+        cmds << secure(zwave.batteryV1.batteryGet())
 	} else if (!state.associationQuery) {
 		log.debug "checking association"
 		cmds << "delay 4200"
@@ -294,8 +300,6 @@ def refresh() {
 		state.associationQuery = now()
 	}
 	log.debug "refresh sending ${cmds.inspect()}"
-	cmds << zwave.batteryV1.batteryGet().format()
-    cmds << secure(zwave.doorLockV1.doorLockConfigurationSet(insideDoorHandlesState: 0, lockTimeoutMinutes: 0, lockTimeoutSeconds: lockTimeoutSeconds.toInteger(), operationType: 2, outsideDoorHandlesState: 0))
 	cmds
 }
 
@@ -322,7 +326,7 @@ def poll() {
 }
 
 private secure(physicalgraph.zwave.Command cmd) {
-//	log.debug "CMD: $cmd"
+	log.debug "CMD: $cmd"
 	zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
 }
 
